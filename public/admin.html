@@ -152,6 +152,26 @@
             renderFiles(data.files || [], id);
         }
 
+        async function logout() {
+            if (!confirm("Bạn có chắc chắn muốn đăng xuất không?")) return;
+
+            try {
+                const res = await fetch('/api/logout');
+                const data = await res.json();
+
+                if (data.success) {
+                    // Đăng xuất xong thì đá về trang login ngay lập tức
+                    window.location.href = '/login.html';
+                } else {
+                    alert("Lỗi khi đăng xuất!");
+                }
+            } catch (err) {
+                console.error("Lỗi kết nối:", err);
+                // Nếu server lỗi thì vẫn nên cho người dùng về trang login cho an toàn
+                window.location.href = '/login.html';
+            }
+        }
+
         function renderFiles(files, id) {
             const list = document.getElementById('admin-file-list');
             list.innerHTML = files.map(f => {

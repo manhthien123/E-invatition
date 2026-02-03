@@ -88,7 +88,7 @@ app.get('/api/logout', (req, res) => {
         if (err) {
             return res.status(500).json({ success: false });
         }
-        res.clearCookie('connect.sid'); // Xóa cookie của session
+        res.clearCookie('connect.sid'); // Xóa cookie phiên làm việc
         res.json({ success: true });
     });
 });
