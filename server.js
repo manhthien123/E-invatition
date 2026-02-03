@@ -178,6 +178,36 @@ app.delete('/api/meeting/:id', auth, (req, res) => {
     }
 });
 
+app.post('/api/delete-file/:id', auth, (req, res) => {
+    const { id } = req.params;
+    const { fileName } = req.body; // Đây là realPath (tên file gốc trên server)
+    let data = readData();
+
+    if (data.meetings[id]) {
+        // 1. Xác định đường dẫn tuyệt đối đến file
+        const absolutePath = path.join(__dirname, 'uploads', fileName);
+        
+        // 2. Xóa file vật lý trên ổ đĩa
+        if (fs.existsSync(absolutePath)) {
+            try {
+                fs.unlinkSync(absolutePath);
+                console.log(`Đã xóa file: ${absolutePath}`);
+            } catch (err) {
+                console.error("Lỗi khi xóa file vật lý:", err);
+            }
+        }
+
+        // 3. Xóa thông tin file trong data.json
+        // Dùng realPath để lọc chính xác file cần xóa
+        data.meetings[id].files = data.meetings[id].files.filter(f => f.realPath !== fileName);
+        
+        saveData(data);
+        res.json({ success: true });
+    } else {
+        res.status(404).json({ error: "Không tìm thấy cuộc họp" });
+    }
+});
+
 app.use(express.static('public'));
 
 // API lấy toàn bộ danh sách cuộc họp từ file data.json
