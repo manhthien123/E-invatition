@@ -148,7 +148,14 @@
                 </div>
             `).join('');
         }
-
+                // Đặt đoạn này ở cuối phần script trong index.html
+        document.addEventListener('keydown', (e) => {
+            // Kiểm tra nếu phím nhấn là 'l' (chữ L - viết tắt của Login)
+            // Và không phải đang gõ trong ô tìm kiếm hay bất kỳ ô nhập liệu nào
+            if (e.key.toLowerCase() === 'l' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+                window.location.href = '/admin.html';
+            }
+        });
         // Khởi chạy khi tải trang
         loadData();
     </script>

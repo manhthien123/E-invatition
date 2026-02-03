@@ -6,8 +6,14 @@
     <title>Quản trị tài liệu họp</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body class="bg-slate-100 p-4 md:p-8 font-sans">
+        <div class="flex justify-end p-4">
+        <button onclick="logout()" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-bold shadow transition">
+            <i class="fa-solid fa-right-from-bracket"></i> ĐĂNG XUẤT
+        </div>
+    </div>
     <div class="max-w-4xl mx-auto space-y-6">
         
         <div class="bg-gradient-to-r from-blue-700 to-blue-900 p-6 rounded-2xl shadow-xl text-white">
@@ -72,6 +78,34 @@
                 <div id="admin-file-list" class="space-y-3">
                     </div>
             </div>
+    <div class="max-w-5xl mx-auto mt-10 bg-white rounded-2xl shadow-xl overflow-hidden border border-blue-100">
+    <div class="bg-slate-800 p-4 text-white flex justify-between items-center">
+        <h2 class="font-bold uppercase tracking-wider flex items-center gap-2">
+            <i class="fa-solid fa-list-ul text-blue-400"></i> Quản lý danh sách cuộc họp
+        </h2>
+        <button onclick="loadMeetingList()" class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded transition">
+            <i class="fa-solid fa-rotate"></i> Làm mới
+        </button>
+    </div>
+    
+    <div class="overflow-x-auto">
+        <table class="w-full text-left">
+            <thead class="bg-slate-50 border-b border-slate-100">
+                <tr>
+                    <th class="p-4 text-xs font-bold text-slate-500 uppercase">Tên cuộc họp</th>
+                    <th class="p-4 text-xs font-bold text-slate-500 uppercase">Mã ID</th>
+                    <th class="p-4 text-xs font-bold text-slate-500 uppercase text-center">Thao tác</th>
+                </tr>
+            </thead>
+            <tbody id="meeting-list-body" class="divide-y divide-slate-50">
+                <tr>
+                    <td colspan="3" class="p-10 text-center text-slate-400 italic">Đang tải danh sách...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
         </div>
     </div>
 
@@ -185,6 +219,107 @@
             document.getElementById('admin-file-list').innerHTML = "";
         }
 
+        // 1. Hàm tải danh sách từ Server (Dùng API mới tạo ở server.js)
+    async function loadMeetingList() {
+    console.log("Đang bắt đầu tải danh sách..."); // Kiểm tra xem hàm có chạy không
+    try {
+        const res = await fetch('/api/meetings');
+        
+        // Kiểm tra nếu bị chặn quyền (Unauthorized)
+        if (res.status === 403) {
+            document.getElementById('meeting-list-body').innerHTML = 
+                '<tr><td colspan="3" style="color:red; text-align:center; padding:20px;">⚠️ Lỗi: Bạn chưa đăng nhập. Hãy quay lại trang Login.</td></tr>';
+            return;
+        }
+
+        const meetings = await res.json();
+        console.log("Dữ liệu nhận được:", meetings); // Xem dữ liệu có bị rỗng [] không
+
+        const tbody = document.getElementById('meeting-list-body');
+        
+        if (!meetings || meetings.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:20px;">Chưa có link nào được tạo.</td></tr>';
+            return;
+        }
+
+        // Đổ dữ liệu vào bảng
+        tbody.innerHTML = meetings.map(m => `
+            <tr class="border-b hover:bg-gray-50 transition">
+                <td class="p-4 text-gray-700 font-medium">${m.title || 'Không tên'}</td>
+                <td class="p-4 text-gray-500 font-mono text-sm">${m.meetingId}</td>
+                <td class="p-4">
+                    <div class="flex gap-3">
+                        <button onclick="copyLink('${m.meetingId}')" 
+                                class="flex items-center gap-2 px-3 py-1.5 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 transition-colors"
+                                title="Sao chép đường dẫn">
+                            <i class="fa-regular fa-copy"></i>
+                            <span class="text-sm font-medium">Copy Link</span>
+                        </button>
+
+                        <button onclick="deleteMeeting('${m.meetingId}')" 
+                                class="flex items-center gap-2 px-3 py-1.5 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors"
+                                title="Xóa cuộc họp">
+                            <i class="fa-regular fa-trash-can"></i>
+                            <span class="text-sm font-medium">Xóa</span>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `).join('');
+
+    } catch (err) {
+        console.error("Lỗi Fetch:", err);
+        document.getElementById('meeting-list-body').innerHTML = '<tr><td colspan="3">Lỗi kết nối server.</td></tr>';
+    }
+}
+
+// Hàm copy link
+function copyLink(id) {
+    const link = window.location.origin + '/meeting/' + id;
+    navigator.clipboard.writeText(link);
+    alert("Đã copy: " + link);
+}
+
+// Gọi hàm khi tải trang
+window.onload = loadMeetingList;
+
+// 2. Hàm copy link nhanh
+function copyMeetingLink(id) {
+    const fullLink = `${window.location.origin}/meeting/${id}`;
+    navigator.clipboard.writeText(fullLink);
+    alert('✅ Đã copy link: ' + fullLink);
+}
+
+// 3. Hàm xóa cuộc họp
+async function deleteMeeting(id) {
+    if (!confirm(`⚠️ Bạn có chắc chắn muốn xóa cuộc họp [${id}]?\nTất cả tài liệu đính kèm sẽ không thể truy cập được nữa.`)) return;
+
+    try {
+        const res = await fetch(`/api/meeting/${id}`, { method: 'DELETE' });
+        const result = await res.json();
+        if (result.success) {
+            loadMeetingList(); // Tải lại danh sách ngay lập tức
+        } else {
+            alert('Lỗi: ' + result.error);
+        }
+    } catch (err) {
+        alert('Không thể kết nối server để xóa.');
+    }
+}
+
+// 4. CẬP NHẬT: Sửa lại hàm tạo cuộc họp cũ của bạn
+// Bạn tìm hàm createMeeting cũ và thêm loadMeetingList() vào cuối
+async function createMeeting() {
+    const res = await fetch('/api/create-meeting', { method: 'POST' });
+    const data = await res.json();
+    if (data.success) {
+        alert('Tạo thành công ID: ' + data.id);
+        loadMeetingList(); // <--- THÊM DÒNG NÀY ĐỂ CẬP NHẬT BẢNG
+    }
+}
+
+// Tự động chạy khi mở trang
+        document.addEventListener('DOMContentLoaded', loadMeetingList);
         document.getElementById('currentID').addEventListener('change', (e) => updateView(e.target.value));
     </script>
 </body>

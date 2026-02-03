@@ -33,7 +33,13 @@ app.use(session({
 }));
 
 // Middleware bảo vệ Admin
-const auth = (req, res, next) => req.session.isAdmin ? next() : res.status(403).json({ error: 'Unauthorized' });
+const auth = (req, res, next) => {
+    if (req.session && req.session.isAdmin) {
+        next(); // Cho phép đi tiếp
+    } else {
+        res.status(403).json({ error: 'Unauthorized' }); // Chặn lại
+    }
+};
 
 // --- CÁC ROUTE GIAO DIỆN ---
 
@@ -64,12 +70,36 @@ app.get('/view-pdf/:filename', (req, res) => {
 
 // --- CÁC API HỆ THỐNG ---
 
-// API Login
+// --- API ĐĂNG NHẬP ---
 app.post('/api/login', (req, res) => {
-    if (req.body.password === 'admin123') {
+    const { password } = req.body;
+    // Bạn có thể đổi 'admin123' thành mật khẩu bạn muốn
+    if (password === 'admin123') {
         req.session.isAdmin = true;
         res.json({ success: true });
-    } else res.status(401).json({ success: false });
+    } else {
+        res.status(401).json({ success: false, message: "Sai mật khẩu!" });
+    }
+});
+
+// --- API ĐĂNG XUẤT ---
+app.get('/api/logout', (req, res) => {
+    req.session.destroy((err) => {
+        if (err) {
+            return res.status(500).json({ success: false });
+        }
+        res.clearCookie('connect.sid'); // Xóa cookie của session
+        res.json({ success: true });
+    });
+});
+
+// --- KIỂM TRA TRẠNG THÁI ĐĂNG NHẬP (Dùng cho Admin.html) ---
+app.get('/api/auth-check', (req, res) => {
+    if (req.session && req.session.isAdmin) {
+        res.json({ loggedIn: true });
+    } else {
+        res.json({ loggedIn: false });
+    }
 });
 
 // 1. API Tạo cuộc họp mới (Sinh ID ngẫu nhiên)
@@ -125,21 +155,46 @@ app.post('/api/upload/:id', auth, upload.single('file'), (req, res) => {
 });
 
 // 5. API Xóa file theo ID
-app.post('/api/delete-file/:id', auth, (req, res) => {
-    const { id } = req.params;
-    const { fileName } = req.body; // filename thực tế trong thư mục uploads
-    let data = readData();
+app.delete('/api/meeting/:id', auth, (req, res) => {
+    try {
+        const { id } = req.params;
+        let data = readData();
+        
+        if (data.meetings[id]) {
+            // Xóa các file vật lý liên quan trước khi xóa dữ liệu chữ
+            data.meetings[id].files.forEach(file => {
+                const filePath = path.join(__dirname, 'uploads', file.realPath);
+                if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+            });
 
-    if (data.meetings[id]) {
-        const absolutePath = path.join(__dirname, 'uploads', fileName);
-        if (fs.existsSync(absolutePath)) fs.unlinkSync(absolutePath);
-
-        data.meetings[id].files = data.meetings[id].files.filter(f => !f.path.includes(fileName));
-        saveData(data);
-        res.json({ success: true });
-    } else res.status(404).json({ error: "Không tìm thấy" });
+            delete data.meetings[id]; // Xóa ID cuộc họp khỏi object
+            saveData(data); // Lưu lại vào data.json
+            res.json({ success: true });
+        } else {
+            res.status(404).json({ error: "ID không tồn tại" });
+        }
+    } catch (err) {
+        res.status(500).json({ error: "Lỗi khi xóa dữ liệu" });
+    }
 });
 
 app.use(express.static('public'));
+
+// API lấy toàn bộ danh sách cuộc họp từ file data.json
+app.get('/api/meetings', auth, (req, res) => {
+    try {
+        const data = readData(); // Hàm này bạn đã có trong server.js
+        // Chuyển object meetings thành một mảng để frontend dễ hiển thị
+        const meetingList = Object.keys(data.meetings).map(id => {
+            return {
+                meetingId: id,
+                ...data.meetings[id]
+            };
+        });
+        res.json(meetingList);
+    } catch (err) {
+        res.status(500).json({ error: "Không thể đọc dữ liệu file" });
+    }
+});
 
 app.listen(3000, '0.0.0.0', () => console.log('Server is running at http://localhost:3000'));
