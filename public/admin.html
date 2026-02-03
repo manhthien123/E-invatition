@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quản trị tài liệu họp</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-slate-100 p-4 md:p-8 font-sans">
+    <div class="max-w-4xl mx-auto space-y-6">
+        
+        <div class="bg-gradient-to-r from-blue-700 to-blue-900 p-6 rounded-2xl shadow-xl text-white">
+            <h2 class="text-xl font-bold mb-4 flex items-center gap-2">
+                <i class="fa-solid fa-link"></i> QUẢN LÝ ĐƯỜNG DẪN CUỘC HỌP
+            </h2>
+            <div class="flex flex-wrap gap-4 items-end">
+                <div class="flex-1 min-w-[200px]">
+                    <label class="block text-xs font-bold mb-1 opacity-80 uppercase">Mã ID cuộc họp:</label>
+                    <input id="currentID" type="text" placeholder="Gõ ID hoặc bấm Tạo mới..." 
+                           class="w-full p-2.5 rounded-lg bg-white/20 border border-white/30 text-white font-mono font-bold outline-none focus:ring-2 focus:ring-blue-400">
+                </div>
+                <button onclick="createNewMeeting()" class="bg-green-500 hover:bg-green-600 px-6 py-2.5 rounded-lg font-bold transition shadow-md">
+                    TẠO MỚI
+                </button>
+                <button onclick="copyMeetingLink()" class="bg-white/10 hover:bg-white/20 px-6 py-2.5 rounded-lg font-bold transition border border-white/30">
+                    COPY LINK
+                </button>
+            </div>
+            <p id="shareLink" class="mt-3 text-sm text-blue-200 font-medium italic"></p>
+        </div>
+
+        <div class="bg-white p-6 rounded-2xl shadow-lg border border-slate-200">
+            <h3 class="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                <i class="fa-solid fa-pen-to-square text-blue-500"></i> Nội dung cuộc họp
+            </h3>
+            <div class="grid grid-cols-1 gap-4">
+                <input id="title" type="text" placeholder="Chương trình/Tiêu đề họp" class="w-full border p-2.5 rounded-lg outline-none focus:border-blue-500">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <input id="time" type="text" placeholder="Thời gian (VD: 08:00 - 02/02/2026)" class="w-full border p-2.5 rounded-lg">
+                    <input id="location" type="text" placeholder="Địa điểm" class="w-full border p-2.5 rounded-lg">
+                </div>
+                <textarea id="members" placeholder="Thành phần tham dự..." rows="2" class="w-full border p-2.5 rounded-lg"></textarea>
+                <button onclick="updateInfo()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition">
+                    CẬP NHẬT THÔNG TIN CHUNG
+                </button>
+            </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-2xl shadow-lg border border-slate-200">
+            <h3 class="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                <i class="fa-solid fa-file-arrow-up text-green-500"></i> Đăng tải tài liệu (PDF)
+            </h3>
+            <div class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <select id="category" class="border p-2.5 rounded-lg bg-slate-50">
+                        <option value="Giấy mời họp">Giấy mời họp</option>
+                        <option value="Tài liệu phiên họp">Tài liệu phiên họp</option>
+                        <option value="Kết luận họp">Kết luận họp</option>
+                        <option value="Tài liệu tham khảo">Tài liệu tham khảo</option>
+                    </select>
+                    <input id="displayName" type="text" placeholder="Tên văn bản hiển thị..." class="border p-2.5 rounded-lg">
+                </div>
+                <input id="fileInput" type="file" accept=".pdf" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                <button onclick="uploadFile()" class="w-full bg-slate-800 hover:bg-black text-white font-bold py-3 rounded-lg transition uppercase tracking-wider">
+                    Đăng tài liệu lên hệ thống
+                </button>
+            </div>
+
+            <div class="mt-8 pt-6 border-t border-slate-100">
+                <h4 class="text-sm font-bold text-slate-500 uppercase mb-4 tracking-widest">Tài liệu đã tải lên</h4>
+                <div id="admin-file-list" class="space-y-3">
+                    </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 1. Kiểm tra an ninh
+        async function checkSecurity() {
+            try {
+                const res = await fetch('/api/data/check'); // Route giả định để check quyền
+                if (res.status === 403 || res.status === 401) window.location.href = '/login.html';
+            } catch (err) { /* Bỏ qua nếu chưa cài route check */ }
+        }
+        checkSecurity();
+
+        // 2. Tạo ID mới
+        async function createNewMeeting() {
+            const res = await fetch('/api/create-meeting', { method: 'POST' });
+            const result = await res.json();
+            if (result.success) {
+                document.getElementById('currentID').value = result.id;
+                updateView(result.id);
+                alert("Mã ID mới: " + result.id);
+            }
+        }
+
+        // 3. Cập nhật giao diện khi có ID
+        function updateView(id) {
+            if (!id) return;
+            const fullLink = window.location.origin + "/meeting/" + id;
+            document.getElementById('shareLink').innerHTML = `Link khách: <a href="${fullLink}" target="_blank" class="underline">${fullLink}</a>`;
+            loadMeetingData(id);
+        }
+
+        // 4. Tải dữ liệu từ ID
+        async function loadMeetingData(id) {
+            const res = await fetch(`/api/data/${id}`);
+            if (!res.ok) { resetForm(); return; }
+            const data = await res.json();
+            
+            document.getElementById('title').value = data.title || "";
+            document.getElementById('time').value = data.time || "";
+            document.getElementById('location').value = data.location || "";
+            document.getElementById('members').value = data.members || "";
+            
+            renderFiles(data.files || [], id);
+        }
+
+        function renderFiles(files, id) {
+            const list = document.getElementById('admin-file-list');
+            list.innerHTML = files.map(f => {
+                const fileName = f.path.split('/').pop();
+                return `
+                <div class="flex justify-between items-center bg-slate-50 p-3 rounded-lg border border-slate-200 shadow-sm">
+                    <span class="text-sm font-medium text-slate-700">${f.name} <span class="text-xs text-slate-400">(${f.category})</span></span>
+                    <button onclick="deleteFile('${id}', '${fileName}')" class="text-red-500 hover:bg-red-50 px-3 py-1 rounded text-xs font-bold uppercase transition">Xóa</button>
+                </div>`;
+            }).join('');
+        }
+
+        // 5. Các hàm API chính
+        async function updateInfo() {
+            const id = document.getElementById('currentID').value;
+            if(!id) return alert("Chưa có ID!");
+            const data = {
+                title: document.getElementById('title').value,
+                time: document.getElementById('time').value,
+                location: document.getElementById('location').value,
+                members: document.getElementById('members').value
+            };
+            const res = await fetch(`/api/update-info/${id}`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            });
+            if(res.ok) alert("Lưu thành công!");
+        }
+
+        async function uploadFile() {
+            const id = document.getElementById('currentID').value;
+            const fileInput = document.getElementById('fileInput');
+            if(!id || fileInput.files.length === 0) return alert("Thiếu ID hoặc File!");
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            formData.append('category', document.getElementById('category').value);
+            formData.append('displayName', document.getElementById('displayName').value);
+
+            const res = await fetch(`/api/upload/${id}`, { method: 'POST', body: formData });
+            if(res.ok) { alert("Đã đăng file!"); loadMeetingData(id); }
+        }
+
+        async function deleteFile(id, fileName) {
+            if(!confirm("Xóa file này?")) return;
+            const res = await fetch(`/api/delete-file/${id}`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ fileName })
+            });
+            if(res.ok) loadMeetingData(id);
+        }
+
+        function copyMeetingLink() {
+            const id = document.getElementById('currentID').value;
+            if(!id) return;
+            const link = window.location.origin + "/meeting/" + id;
+            navigator.clipboard.writeText(link);
+            alert("Đã copy!");
+        }
+
+        function resetForm() {
+            document.querySelectorAll('input:not(#currentID), textarea').forEach(i => i.value = "");
+            document.getElementById('admin-file-list').innerHTML = "";
+        }
+
+        document.getElementById('currentID').addEventListener('change', (e) => updateView(e.target.value));
+    </script>
+</body>
+</html>

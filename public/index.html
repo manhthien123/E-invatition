@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tài liệu Cuộc họp</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body class="bg-slate-50 p-4 md:p-8 font-sans">
+
+    <div class="max-w-5xl mx-auto bg-white rounded-2xl shadow-xl overflow-hidden border border-blue-100">
+        
+        <div class="bg-blue-600 p-6 text-white">
+            <div class="flex flex-col md:flex-row items-center gap-6">
+                <div class="w-24 h-24 bg-white rounded-full flex items-center justify-center shadow-inner overflow-hidden p-2">
+                    <img src="/logo.png" alt="Logo" class="max-w-full h-auto" onerror="this.src='https://via.placeholder.com/100?text=LOGO'">
+                </div>
+                <div class="flex-1 text-center md:text-left">
+                    <h1 id="view-title" class="text-2xl md:text-3xl font-bold uppercase tracking-tight">Đang tải dữ liệu...</h1>
+                    <p class="text-blue-100 mt-1 italic uppercase text-xs tracking-widest">Hệ thống cung cấp tài liệu điện tử</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="p-6 bg-blue-50/50 grid grid-cols-1 md:grid-cols-2 gap-4 border-b border-blue-100">
+            <div class="flex gap-3 items-start">
+                <i class="fa-solid fa-calendar-day text-blue-500 mt-1"></i>
+                <div>
+                    <span class="block text-[10px] font-bold text-blue-400 uppercase tracking-wider">Thời gian bắt đầu</span>
+                    <span id="view-time" class="text-gray-700 font-medium font-mono">--/--/----</span>
+                </div>
+            </div>
+            <div class="flex gap-3 items-start">
+                <i class="fa-solid fa-location-dot text-blue-500 mt-1"></i>
+                <div>
+                    <span class="block text-[10px] font-bold text-blue-400 uppercase tracking-wider">Địa điểm</span>
+                    <span id="view-location" class="text-gray-700 font-medium">---</span>
+                </div>
+            </div>
+            <div class="flex gap-3 items-start md:col-span-2">
+                <i class="fa-solid fa-users text-blue-500 mt-1"></i>
+                <div>
+                    <span class="block text-[10px] font-bold text-blue-400 uppercase tracking-wider">Thành phần tham dự</span>
+                    <span id="view-members" class="text-gray-700 leading-relaxed text-sm">---</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="p-6 md:p-8 min-h-[400px]">
+            <h2 class="text-xl font-bold text-blue-800 mb-6 flex items-center gap-2">
+                <i class="fa-solid fa-file-lines"></i> DANH MỤC TÀI LIỆU HỌP
+            </h2>
+            
+            <div id="file-sections" class="space-y-6">
+                <div class="text-center py-10">
+                    <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-600 border-t-transparent"></div>
+                    <p class="mt-2 text-gray-500 italic">Vui lòng chờ giây lát...</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-gray-50 p-4 text-center text-[10px] text-gray-400 border-t uppercase tracking-widest">
+            &copy; Hệ thống quản lý tài liệu nội bộ
+        </div>
+    </div>
+
+    <script>
+        async function loadData() {
+            // 1. Lấy ID từ URL (vd: /meeting/abcxyz)
+            const pathParts = window.location.pathname.split('/');
+            const meetingID = pathParts[pathParts.length - 1];
+
+            if (!meetingID || meetingID === 'index.html') {
+                document.getElementById('file-sections').innerHTML = `
+                    <div class="text-center p-10 bg-red-50 rounded-xl border border-red-100">
+                        <i class="fa-solid fa-triangle-exclamation text-red-400 text-4xl mb-4"></i>
+                        <p class="text-red-700 font-bold">LỖI TRUY CẬP</p>
+                        <p class="text-red-500 text-sm italic">Vui lòng sử dụng đường link quét từ mã QR hoặc được cung cấp chính thức.</p>
+                    </div>`;
+                document.getElementById('view-title').innerText = "TRUY CẬP KHÔNG HỢP LỆ";
+                return;
+            }
+
+            try {
+                // 2. Gọi API lấy dữ liệu theo ID
+                const res = await fetch(`/api/data/${meetingID}`);
+                if (!res.ok) throw new Error("ID không tồn tại");
+                const data = await res.json();
+                
+                // 3. Hiển thị thông tin chữ
+                document.getElementById('view-title').innerText = data.title || "TÀI LIỆU CUỘC HỌP";
+                document.getElementById('view-time').innerText = data.time || "Chưa cập nhật";
+                document.getElementById('view-location').innerText = data.location || "Chưa cập nhật";
+                document.getElementById('view-members').innerText = data.members || "Chưa cập nhật";
+
+                // 4. Gọi hàm hiển thị file
+                renderFileSections(data.files || []);
+
+            } catch (err) {
+                console.error("Lỗi:", err);
+                document.getElementById('file-sections').innerHTML = `
+                    <div class="text-center p-10 bg-yellow-50 rounded-xl border border-yellow-100">
+                        <p class="text-yellow-700 font-bold italic">Không tìm thấy dữ liệu cuộc họp này!</p>
+                    </div>`;
+            }
+        }
+
+        function renderFileSections(files) {
+            const container = document.getElementById('file-sections');
+            
+            if (!files || files.length === 0) {
+                container.innerHTML = '<p class="text-gray-400 italic text-center py-10">Hiện chưa có tài liệu nào được đăng tải.</p>';
+                return;
+            }
+
+            // Nhóm file theo chuyên mục
+            const groups = files.reduce((acc, file) => {
+                (acc[file.category] = acc[file.category] || []).push(file);
+                return acc;
+            }, {});
+
+            container.innerHTML = Object.keys(groups).map(cat => `
+                <div class="border border-blue-100 rounded-xl overflow-hidden shadow-sm bg-white">
+                    <div class="bg-blue-50 px-4 py-3 border-b border-blue-100 flex items-center gap-2">
+                        <i class="fa-solid fa-folder-open text-blue-500"></i>
+                        <h3 class="font-bold text-blue-700 uppercase text-xs tracking-wider">${cat}</h3>
+                    </div>
+                    <div class="divide-y divide-blue-50">
+                        ${groups[cat].map(f => {
+                            // Lấy tên file gốc để mở link trực tiếp qua view-pdf
+                            const fileName = f.path.split('/').pop();
+                            return `
+                            <a href="/view-pdf/${fileName}" target="_blank" 
+                               class="flex items-center justify-between p-4 hover:bg-blue-50/40 transition">
+                                <div class="flex items-center gap-4">
+                                    <div class="bg-red-50 p-2 rounded-lg">
+                                        <i class="fa-solid fa-file-pdf text-red-500 text-xl"></i>
+                                    </div>
+                                    <span class="text-gray-700 font-medium text-sm md:text-base">${f.name}</span>
+                                </div>
+                                <div class="text-blue-500 text-[10px] font-bold flex items-center gap-2 uppercase">
+                                    Mở tài liệu <i class="fa-solid fa-circle-chevron-right text-sm"></i>
+                                </div>
+                            </a>`;
+                        }).join('')}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Khởi chạy khi tải trang
+        loadData();
+    </script>
+</body>
+</html>
